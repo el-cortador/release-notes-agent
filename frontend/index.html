@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Release Notes Agent</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
+        input { width: 100%; padding: 8px; margin: 6px 0 16px; box-sizing: border-box; }
+        button { padding: 10px 24px; background: #000; color: #fff; border: none; cursor: pointer; }
+        button:disabled { background: #888; cursor: not-allowed; }
+        #output { margin-top: 24px; background: #f5f5f5; padding: 16px; }
+        #output.error { color: #c00; }
+    </style>
+</head>
+<body>
+    <h2>Release Notes Agent</h2>
+
+    <label>Ссылка на репозиторий</label>
+    <input id="repo_url" type="url" placeholder="https://github.com/owner/repo">
+
+    <label>Ветка (необязательно)</label>
+    <input id="branch" type="text" placeholder="main">
+
+    <label>С какой даты (YYYY-MM-DD)</label>
+    <input id="since" type="date">
+
+    <button id="btn" onclick="generate()">Сгенерировать</button>
+
+    <div id="output">Результат появится здесь...</div>
+
+    <script>
+        function parseGitHubUrl(url) {
+            try {
+                const match = new URL(url).pathname.match(/^\/([^/]+)\/([^/]+?)(?:\.git)?$/);
+                if (!match) return null;
+                return { owner: match[1], repo: match[2] };
+            } catch {
+                return null;
+            }
+        }
+
+        async function generate() {
+            const repoUrl = document.getElementById("repo_url").value.trim();
+            const branch = document.getElementById("branch").value.trim();
+            const since = document.getElementById("since").value;
+            const output = document.getElementById("output");
+            const btn = document.getElementById("btn");
+
+            const parsed = parseGitHubUrl(repoUrl);
+            if (!parsed) {
+                output.className = "error";
+                output.textContent = "Укажите корректную ссылку на GitHub-репозиторий.";
+                return;
+            }
+            if (!since) {
+                output.className = "error";
+                output.textContent = "Укажите дату начала периода.";
+                return;
+            }
+
+            output.className = "";
+            output.textContent = "Генерирую...";
+            btn.disabled = true;
+
+            try {
+                const response = await fetch("/generate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ owner: parsed.owner, repo: parsed.repo, branch, since }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    output.className = "error";
+                    output.textContent = data.error || "Неизвестная ошибка.";
+                } else {
+                    output.className = "";
+                    output.innerHTML = marked.parse(data.result);
+                }
+            } catch (err) {
+                output.className = "error";
+                output.textContent = "Не удалось подключиться к серверу.";
+            } finally {
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
