@@ -6,8 +6,15 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
-        input { width: 100%; padding: 8px; margin: 6px 0 16px; box-sizing: border-box; }
-        button { padding: 10px 24px; background: #000; color: #fff; border: none; cursor: pointer; }
+        .tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 2px solid #000; }
+        .tab { padding: 8px 20px; cursor: pointer; border: none; background: none; font-size: 14px; color: #666; }
+        .tab.active { color: #000; font-weight: 600; border-bottom: 2px solid #000; margin-bottom: -2px; }
+        .panel { display: none; }
+        .panel.active { display: block; }
+        label { display: block; margin-bottom: 4px; font-size: 14px; }
+        input, textarea { width: 100%; padding: 8px; margin-bottom: 16px; box-sizing: border-box; font-family: inherit; font-size: 14px; border: 1px solid #ccc; }
+        textarea { resize: vertical; min-height: 120px; }
+        button { padding: 10px 24px; background: #000; color: #fff; border: none; cursor: pointer; font-size: 14px; }
         button:disabled { background: #888; cursor: not-allowed; }
         #output { margin-top: 24px; background: #f5f5f5; padding: 16px; }
         #output.error { color: #c00; }
@@ -16,20 +23,45 @@
 <body>
     <h2>Release Notes Agent</h2>
 
-    <label>Ссылка на репозиторий</label>
-    <input id="repo_url" type="url" placeholder="https://github.com/owner/repo">
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('github')">GitHub</button>
+        <button class="tab" onclick="switchTab('jira')">Jira</button>
+    </div>
 
-    <label>Ветка (необязательно)</label>
-    <input id="branch" type="text" placeholder="main">
+    <div id="panel-github" class="panel active">
+        <label>Ссылка на репозиторий</label>
+        <input id="repo_url" type="url" placeholder="https://github.com/owner/repo">
 
-    <label>С какой даты (YYYY-MM-DD)</label>
-    <input id="since" type="date">
+        <label>Ветка (необязательно)</label>
+        <input id="branch" type="text" placeholder="main">
+
+        <label>С какой даты (YYYY-MM-DD)</label>
+        <input id="since" type="date">
+    </div>
+
+    <div id="panel-jira" class="panel">
+        <label>URL задач (по одному на строку)</label>
+        <textarea id="jira_urls" placeholder="https://company.atlassian.net/browse/PROJ-123&#10;https://company.atlassian.net/browse/PROJ-456"></textarea>
+    </div>
 
     <button id="btn" onclick="generate()">Сгенерировать</button>
 
-    <div id="output">Результат появится здесь...</div>
+    <div id="output"></div>
 
     <script>
+        let activeTab = 'github';
+
+        function switchTab(tab) {
+            activeTab = tab;
+            document.querySelectorAll('.tab').forEach((el, i) => {
+                el.classList.toggle('active', (i === 0 && tab === 'github') || (i === 1 && tab === 'jira'));
+            });
+            document.getElementById('panel-github').classList.toggle('active', tab === 'github');
+            document.getElementById('panel-jira').classList.toggle('active', tab === 'jira');
+            document.getElementById('output').className = '';
+            document.getElementById('output').innerHTML = '';
+        }
+
         function parseGitHubUrl(url) {
             try {
                 const match = new URL(url).pathname.match(/^\/([^/]+)\/([^/]+?)(?:\.git)?$/);
@@ -41,47 +73,64 @@
         }
 
         async function generate() {
-            const repoUrl = document.getElementById("repo_url").value.trim();
-            const branch = document.getElementById("branch").value.trim();
-            const since = document.getElementById("since").value;
-            const output = document.getElementById("output");
-            const btn = document.getElementById("btn");
+            const output = document.getElementById('output');
+            const btn = document.getElementById('btn');
 
-            const parsed = parseGitHubUrl(repoUrl);
-            if (!parsed) {
-                output.className = "error";
-                output.textContent = "Укажите корректную ссылку на GitHub-репозиторий.";
-                return;
-            }
-            if (!since) {
-                output.className = "error";
-                output.textContent = "Укажите дату начала периода.";
-                return;
+            let endpoint, body;
+
+            if (activeTab === 'github') {
+                const repoUrl = document.getElementById('repo_url').value.trim();
+                const branch = document.getElementById('branch').value.trim();
+                const since = document.getElementById('since').value;
+
+                const parsed = parseGitHubUrl(repoUrl);
+                if (!parsed) {
+                    output.className = 'error';
+                    output.textContent = 'Укажите корректную ссылку на GitHub-репозиторий.';
+                    return;
+                }
+                if (!since) {
+                    output.className = 'error';
+                    output.textContent = 'Укажите дату начала периода.';
+                    return;
+                }
+                endpoint = '/generate';
+                body = { owner: parsed.owner, repo: parsed.repo, branch, since };
+            } else {
+                const raw = document.getElementById('jira_urls').value;
+                const urls = raw.split('\n').map(u => u.trim()).filter(Boolean);
+                if (!urls.length) {
+                    output.className = 'error';
+                    output.textContent = 'Вставьте хотя бы один URL задачи.';
+                    return;
+                }
+                endpoint = '/generate-jira';
+                body = { urls };
             }
 
-            output.className = "";
-            output.textContent = "Генерирую...";
+            output.className = '';
+            output.textContent = 'Генерирую...';
             btn.disabled = true;
 
             try {
-                const response = await fetch("/generate", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ owner: parsed.owner, repo: parsed.repo, branch, since }),
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
                 });
 
                 const data = await response.json();
 
                 if (!response.ok) {
-                    output.className = "error";
-                    output.textContent = data.error || "Неизвестная ошибка.";
+                    output.className = 'error';
+                    output.textContent = data.error || 'Неизвестная ошибка.';
                 } else {
-                    output.className = "";
+                    output.className = '';
                     output.innerHTML = marked.parse(data.result);
                 }
-            } catch (err) {
-                output.className = "error";
-                output.textContent = "Не удалось подключиться к серверу.";
+            } catch {
+                output.className = 'error';
+                output.textContent = 'Не удалось подключиться к серверу.';
             } finally {
                 btn.disabled = false;
             }
