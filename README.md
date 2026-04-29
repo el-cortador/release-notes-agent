@@ -1,30 +1,39 @@
 # Release Notes Agent
 
-Веб-приложение, которое автоматически генерирует release notes по коммитам GitHub-репозитория. Использует Claude Sonnet с подключённым GitHub MCP-сервером для получения истории коммитов и формирует читаемый markdown-отчёт на русском языке.
+Веб-приложение для автоматической генерации release notes. Поддерживает два источника данных: коммиты GitHub-репозитория (через Claude Sonnet + GitHub MCP) и задачи Jira (через REST API).
 
 ## Как это работает
 
-1. Пользователь вводит owner/repo и дату начала периода
-2. Flask-бэкенд отправляет запрос в Claude Sonnet API с подключённым GitHub MCP
-3. Claude получает коммиты через MCP и формирует release notes, сгруппированные по типам: Features, Bug Fixes, Other
-4. Результат рендерится как markdown прямо в браузере
+**GitHub:** пользователь указывает ссылку на репозиторий и дату начала периода → бэкенд запрашивает Claude Sonnet с подключённым GitHub MCP → Claude получает историю коммитов и формирует release notes.
+
+**Jira:** пользователь вставляет URL задач → бэкенд вызывает Jira REST API, собирает summary и тип каждой задачи → Claude генерирует release notes на их основе.
+
+Результат рендерится как markdown в браузере и доступен для скачивания в `.md`.
 
 ## Структура проекта
 
 ```
-├── backend/
-│   └── app.py          # Flask API
-├── frontend/
-│   └── index.html      # Одностраничный UI
+├── app/
+│   ├── config.py       # переменные окружения
+│   ├── schemas.py      # Pydantic-модели запросов и ответов
+│   ├── prompts.py      # промпты для Claude
+│   ├── jira.py         # Jira API клиент
+│   └── main.py         # FastAPI приложение
+├── web/
+│   ├── index.html
+│   ├── app.js
+│   └── styles.css
 ├── .env.example
-└── requirements.txt
+├── requirements.txt
+└── run.sh
 ```
 
 ## Требования
 
 - Python 3.10+
-- Ключ Anthropic API с доступом к remote MCP
+- Anthropic API key с доступом к remote MCP
 - GitHub token (для MCP-сервера GitHub Copilot)
+- Jira email + API token (только для режима Jira)
 
 ## Запуск
 
@@ -37,6 +46,10 @@ cp .env.example .env
 ```env
 ANTHROPIC_API_KEY=sk-ant-...
 GITHUB_TOKEN=ghp_...
+
+# Только для режима Jira
+JIRA_EMAIL=user@example.com
+JIRA_API_TOKEN=your-jira-api-token
 ```
 
 **2. Запустите:**
@@ -45,13 +58,13 @@ GITHUB_TOKEN=ghp_...
 bash run.sh
 ```
 
-Скрипт создаёт виртуальное окружение, устанавливает зависимости и стартует сервер. Откройте `http://127.0.0.1:5000`.
+Скрипт устанавливает зависимости и стартует сервер. Откройте `http://127.0.0.1:5001`.
 
 ## API
 
 ### `POST /generate`
 
-Генерирует release notes для указанного репозитория.
+Генерирует release notes по коммитам GitHub.
 
 **Тело запроса:**
 
@@ -59,14 +72,36 @@ bash run.sh
 {
   "owner": "microsoft",
   "repo": "vscode",
-  "since": "2024-01-01"
+  "since": "2024-01-01",
+  "branch": "main"
 }
 ```
 
-**Ответ:**
+### `POST /generate-jira`
+
+Генерирует release notes по задачам Jira.
+
+**Тело запроса:**
+
+```json
+{
+  "urls": [
+    "https://company.atlassian.net/browse/PROJ-123",
+    "https://company.atlassian.net/browse/PROJ-456"
+  ]
+}
+```
+
+### Ответ (оба эндпоинта)
 
 ```json
 {
   "result": "## Features\n- ...\n\n## Bug Fixes\n- ..."
 }
 ```
+
+| Код | Причина |
+|-----|---------|
+| 400 | Не заполнены обязательные поля или невалидный URL |
+| 500 | Не заданы учётные данные в `.env` |
+| 502 | Ошибка при обращении к Anthropic API или Jira |

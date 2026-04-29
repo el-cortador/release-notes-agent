@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Release Notes Agent</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <h1 class="page__title">Release Notes Agent</h1>
+      <p class="page__subtitle">Генерация release notes по коммитам GitHub или задачам Jira</p>
+
+      <section class="card">
+        <div class="tabs" role="tablist">
+          <button class="tab tab--active" id="tab-github" type="button" role="tab" aria-selected="true">GitHub</button>
+          <button class="tab" id="tab-jira" type="button" role="tab" aria-selected="false">Jira</button>
+        </div>
+
+        <div id="section-github">
+          <label class="field">
+            <span class="field__label">Ссылка на репозиторий</span>
+            <input class="field__input" id="repo-url" type="url" placeholder="https://github.com/owner/repo" />
+          </label>
+          <div class="field-row">
+            <label class="field">
+              <span class="field__label">Ветка (необязательно)</span>
+              <input class="field__input" id="branch" type="text" placeholder="main" />
+            </label>
+            <label class="field">
+              <span class="field__label">С какой даты</span>
+              <input class="field__input" id="since" type="date" />
+            </label>
+          </div>
+        </div>
+
+        <div id="section-jira" hidden>
+          <label class="field">
+            <span class="field__label">URL задач (по одному на строку)</span>
+            <textarea
+              class="field__input field__input--textarea"
+              id="jira-urls"
+              placeholder="https://company.atlassian.net/browse/PROJ-123&#10;https://company.atlassian.net/browse/PROJ-456"
+            ></textarea>
+          </label>
+        </div>
+
+        <button class="button button--generate" id="generate-btn" type="button">
+          Сгенерировать ↗
+        </button>
+      </section>
+
+      <section class="result" id="result-section" hidden>
+        <h2 class="result__title">Результат</h2>
+        <div class="result__box" id="result-box"></div>
+        <button class="button button--outline" id="download-btn" type="button">
+          Скачать .md
+        </button>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

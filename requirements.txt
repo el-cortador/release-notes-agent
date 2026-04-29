@@ -1,5 +1,6 @@
 anthropic
-flask
-flask-cors
+fastapi
+uvicorn
 python-dotenv
 requests
+pydantic

@@ -11,5 +11,5 @@ fi
 echo "Using Python: $PYTHON"
 "$PYTHON" -m pip install -q -r requirements.txt
 
-echo "Starting server at http://127.0.0.1:5000"
-"$PYTHON" backend/app.py
+echo "Starting server at http://127.0.0.1:5001"
+"$PYTHON" -m uvicorn app.main:app --host 127.0.0.1 --port 5001

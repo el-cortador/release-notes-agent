@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/Развозжаев Д О/Desktop/Agents/figma-ui-user-guider-agent/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Развозжаев Д О\\Desktop\\Agents\\release-notes-agent"
+    ]
+  }
+}
